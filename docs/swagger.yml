@@ -1,144 +1,205 @@
-openapi: 3.0.0
-components:
-  responses:
-     InternalError:
-      required:
-        - message
-      properties:
-        message:
-          type: string
-          default: Internal Error
-     ValidationError:
-      required:
-        - message
-      properties:
-        message:
-          type: string
-          default: Validation Error
-        validationError:
-          type: array
-          minimum: 1
-          items:
-            type: object
-            properties:
-              code:
-                type: string
-                example: too small
-              minimum:
-                type: number
-                example: 2
-              type:
-                type: string
-                example: string
-              inclusive:
-                type: boolean
-                example: true
-              message:
-                type: string
-                example: Should be at least 2 characters
-              path:
-                type: array
-                items:
-                  type: string
-                  example: example
-     ForbiddenError:
-      required:
-        - message
-      properties:
-        message:
-          type: string
-          default: Forbidden
-     NotFoundError:
-      required:
-        - message
-      properties:
-        message:
-          type: string
-          default: Not Found
-     UnauthorizedError:
-      required:
-        - message
-      properties:
-        message:
-          type: string
-          default: Unauthorized
-     Success:
-      properties:
-        data:
-          type: 
-            oneOf:
-            - type: array
-            - type: object
-          default: Ok
-  schemas:
-    AuthLoginRequest:
-      type: object
-      required:
-        - email
-        - password
-      properties:
-        email:
-          type: string
-          description: unique user email
-          example: 'john@hairsap.com'
-        password:
-          type: string
-          description: card type, either virtual or physical
-          example: 'john1234'
-          minimum: 7
-          maximum: 32
-    AuthLoginResponse:
-      type: object
-      required:
-        - token
-      properties:
-        token:
-          type: string
-          description: a JWT token
-          example: '1592BB17-8B6E-4CA7-AAC2-8140E7BF19AC'
-
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-  
-
+openapi: 3.0.3
 info:
-  title: Hairsap-api
-  description: Hairsap API
-  version: v1.0.0
-servers:
-  - url: 'http://localhost:4000'
-    description: development
+  title: Fund transfer api
+  description: Coding challenge - simple fund transfer api
+  version: 1.0.11
+tags:
+  - name: user
+    description: Create user profile and account
+  - name: account
+    description: Transfer funds between account
 paths:
-  /auth/login:
+  /users:
     post:
-      operationId: postAuthLogin
-      description: allows a user to login
       tags:
-        - Auth
+        - user
+      summary: Onboarding
+      description: Onboards a new user and creates an account
+      operationId: createUser
       requestBody:
+        description: Creates a new user and user account
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/AuthLoginRequest'
-      parameters: []
+            schema: 
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      responses:
+        '200':
+          description: User Created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: invalid input
+  /accounts/deposit:
+    post:
+      tags:
+        - account
+      summary: Deposit
+      description: make deposits into account
+      operationId: deposit
+      requestBody:
+        description: Credits user's account with amount deposited
+        content:
+          application/json:
+            schema: 
+              $ref: '#/components/schemas/Deposit'
+        required: true
       responses:
         '201':
-          description: Status 201 Response
+          description: Deposit funds successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthLoginResponse'
+                $ref: '#/components/schemas/Account'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppError'
+  /accounts/transfer:
+    post:
+      tags:
+        - account
+      summary: Transfers
+      description: transfer funds to another user's account
+      operationId: transfers
+      requestBody:
+        description: Debits receipeints and credits sender
+        content:
+          application/json:
+            schema: 
+              $ref: '#/components/schemas/Transfer'
+        required: true
+      responses:
+        '201':
+          description: Transfer funds successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transfer'
         '400':
-          description: Status 400 Response
+          description: Insufficient balance
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/ValidationError'
-        '500':
-          description: Status 500 Response
+                $ref: '#/components/schemas/AppError'
+        '404':
+          description: Sender account not found or receipent account not found
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/InternalError'
+                $ref: '#/components/schemas/AppError'
+  /accounts/balance/{userId}:
+    get:
+      tags:
+        - account
+      summary: Balance
+      description: gets users account balance
+      operationId: balance
+      parameters:
+        - name: userId
+          in: path
+          description: unique Id of user
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'          
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppError'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identification for new user
+          example: GNY6TSN0u5RSadLscJjDd
+        name:
+          type: string
+          description: Name of user
+          example: Kane
+    UserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Kane
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identification for account
+          example: F8n-xMpAB2GpYD4u9u6Z
+        userId:
+          type: string
+        amount:
+          type: integer
+          example: 5000
+    Deposit:
+      type: object
+      required:
+        - userId
+        - amount
+      properties:
+        userId:
+          type: string
+        amount:
+          type: integer
+          example: 5000
+    Transfer:
+      type: object
+      required:
+        - userId
+        - amount
+        - recepientAccountId
+      properties:
+        userId:
+          type: string
+        recepientAccountId:
+          type: string
+          description: Account Id of recepient
+        amount:
+          type: integer
+          example: 5000
+    AppError:
+      type: object
+      properties:
+        msg:
+          type: string
+  requestBodies:
+    UserRequest:
+      description: user object used for adding new user profile
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserRequest'
+    Deposit:
+      description: object used for making depost
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Deposit'
+    Transfer:
+      description: object used for making transfer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Transfer'

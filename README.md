@@ -24,6 +24,7 @@ Simple api for processing fund transfers.
    npm start
    npm run dev
    ```
+4. Navigate to http://localhost:3000/reference for swagger documentation
 
 ### Contact
 

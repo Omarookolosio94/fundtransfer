@@ -10,11 +10,23 @@ const mockAccounts = [
     id: 'F8n-xMpAB2GpYD4u9u6Z9',
     balance: 5000,
     userId: 'GNY6TSN0u5RSadLscJjDd',
+    subwallets: {
+      "usd": 0,
+      "ngn": 0,
+      "gdp": 0,
+      "yuan": 0
+  }
   },
   {
     id: '02o_H_EQOe093NQmmjVYS',
     balance: 20000,
     userId: 'TtR_nNEJCroj80fSOiec5',
+    subwallets: {
+      "usd": 0,
+      "ngn": 0,
+      "gdp": 0,
+      "yuan": 0
+  }
   },
 ];
 const mockUsers = [

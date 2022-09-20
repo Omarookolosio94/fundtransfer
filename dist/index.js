@@ -50,7 +50,7 @@ var makeUser = ({ repo }) => {
       return res.status(400).send({ validationError: err.issues });
     }
     repo.user.addUser(user);
-    repo.account.createAccount({ id: generateId(), userId: user.id, balance: 0 });
+    repo.account.createAccount({ id: generateId(), userId: user.id, balance: 0, subwallets: { usd: 0, ngn: 0, gdp: 0, yuan: 0 } });
     res.send({ data: user });
   });
   return router;
@@ -68,14 +68,20 @@ var GetBalanceRequestSchema = import_zod2.z.object({
 
 // src/schemas/requests/postDeposit.ts
 var import_zod3 = require("zod");
-var PostDepositRequestSchema = import_zod3.z.object({ amount: import_zod3.z.number().positive(), userId: import_zod3.z.string() }).strict();
+
+// src/const/const.ts
+var CURRENCY = { USD: "usd", NGN: "ngn", GBP: "gdp", YUAN: "yuan" };
+
+// src/schemas/requests/postDeposit.ts
+var PostDepositRequestSchema = import_zod3.z.object({ amount: import_zod3.z.number().positive(), userId: import_zod3.z.string(), currency: import_zod3.z.nativeEnum(CURRENCY) }).strict();
 
 // src/schemas/requests/postTransfer.ts
 var import_zod4 = require("zod");
 var PostTransferRequestSchema = import_zod4.z.object({
   amount: import_zod4.z.number().positive(),
   userId: import_zod4.z.string(),
-  recepientAccountId: import_zod4.z.string()
+  recepientAccountId: import_zod4.z.string(),
+  currency: import_zod4.z.nativeEnum(CURRENCY)
 }).strict();
 
 // src/handlers/account.ts
@@ -180,24 +186,39 @@ var getAccountByUserId = ({ db: db2 }) => (userId) => {
     throw new AppError("User account not found", 404);
   return account;
 };
-var makeDeposit = ({ db: db2 }) => ({ userId, amount }) => {
+var makeDeposit = ({ db: db2 }) => ({ userId, amount, currency }) => {
   const account = db2.Accounts.find((x) => x.userId == userId);
   if (!account)
     throw new AppError("User account not found", 404);
-  account.balance += amount;
+  var currencies = Object.keys(account.subwallets);
+  if (!currencies.includes(currency))
+    throw new AppError("Currency not supported", 404);
+  account.subwallets[currency] = amount;
   return account;
 };
-var makeTransfer = ({ db: db2 }) => ({ amount, userId, recepientAccountId }) => {
+var makeTransfer = ({ db: db2 }) => ({ amount, userId, recepientAccountId, currency }) => {
   const sender = db2.Accounts.find((x) => x.userId == userId);
-  const receipentAccount = db2.Accounts.find((x) => x.id == recepientAccountId);
+  const receipentAccount = db2.Accounts.find(
+    (x) => x.id == recepientAccountId
+  );
   if (!sender)
     throw new AppError("Sender account not found", 404);
   if (!receipentAccount)
     throw new AppError("Receipent account not found", 404);
-  if (amount > sender.balance)
-    throw new AppError("Insufficient balance", 400);
-  sender.balance -= amount;
-  receipentAccount.balance += amount;
+  if (amount < sender.subwallets[currency]) {
+    sender.balance -= amount;
+    receipentAccount.balance += amount;
+  } else {
+    let subbalance = { usd: 0, ngn: 0, gdp: 0, yuan: 0 };
+    subbalance[currency] = sender.subwallets[currency];
+    let totalbalance = sender.subwallets[currency];
+    for (const key in subbalance) {
+      if (key === currency)
+        continue;
+      if (totalbalance >= amount)
+        return;
+    }
+  }
   return sender;
 };
 var makeAccount2 = ({ db: db2 }) => {

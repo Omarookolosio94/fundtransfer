@@ -21,7 +21,7 @@ const makeUser = ({ repo }: { repo: Repo }) => {
 
     repo.user.addUser(user);
 
-    repo.account.createAccount({ id: generateId(), userId: user.id, balance: 0 });
+    repo.account.createAccount({ id: generateId(), userId: user.id, balance: 0, subwallets: { usd: 0, ngn: 0, gdp: 0, yuan: 0} });
 
     res.send({ data: user });
   });

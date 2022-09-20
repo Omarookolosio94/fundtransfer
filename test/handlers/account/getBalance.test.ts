@@ -9,23 +9,36 @@ const mockAccounts = [
     id: 'F8n-xMpAB2GpYD4u9u6Z9',
     balance: 5000,
     userId: 'GNY6TSN0u5RSadLscJjDd',
+    subwallets: {
+      usd: 1000,
+      ngn: 0,
+      gdp: 0,
+      yuan: 0,
+    },
   },
 ];
 const mockUsers = [
   {
     id: 'GNY6TSN0u5RSadLscJjDd',
     name: 'Franklin',
+    subwallets: {
+      usd: 200,
+      ngn: 0,
+      gdp: 0,
+      yuan: 0,
+    },
   },
 ];
 
-const app = (mockAccounts : Account[], mockUsers: User[]) => makeApp({
-  repo: makeRepo({
-    db: {
-      Accounts: mockAccounts,
-      Users: mockUsers
-    },
-  }),
-});
+const app = (mockAccounts: Account[], mockUsers: User[]) =>
+  makeApp({
+    repo: makeRepo({
+      db: {
+        Accounts: mockAccounts,
+        Users: mockUsers,
+      },
+    }),
+  });
 
 describe('get balance of account', function () {
   test('should get Balance successfully', function (done) {

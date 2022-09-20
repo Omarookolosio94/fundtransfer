@@ -38,6 +38,67 @@ var import_nanoid = require("nanoid");
 var generateId = () => {
   return (0, import_nanoid.nanoid)();
 };
+var rates = { usd: 1, ngn: 415, gdp: 0.86, yuan: 6.89 };
+var TransferFund = (senderAccount, amount, currency) => {
+  const account = senderAccount;
+  if (account.subwallets[currency] >= amount) {
+    account.subwallets[currency] = account.subwallets[currency] - amount;
+    return { account, balance: 0 };
+  }
+  const tempWallets = {
+    ngn: convertToUsd({ currency: "ngn", amount: account.subwallets.ngn }).amount,
+    gdp: convertToUsd({ currency: "gdp", amount: account.subwallets.gdp }).amount,
+    yuan: convertToUsd({ currency: "yuan", amount: account.subwallets.yuan }).amount,
+    usd: convertToUsd({ currency: "usd", amount: account.subwallets.usd }).amount
+  };
+  const amountInUsd = convertToUsd({ amount, currency }).amount;
+  let balance = amountInUsd - tempWallets[currency];
+  tempWallets[currency] = 0;
+  for (const key in tempWallets) {
+    if (key === currency)
+      continue;
+    if (tempWallets[key] >= balance) {
+      tempWallets[key] -= balance;
+      balance = 0;
+      break;
+    }
+    balance -= tempWallets[key];
+    tempWallets[key] = 0;
+  }
+  if (balance > 0) {
+    return { account, balance };
+  } else {
+    account.subwallets.gdp = convertFromUsd({
+      amount: tempWallets.gdp,
+      currency: "gdp"
+    }).amount;
+    account.subwallets.usd = convertFromUsd({
+      amount: tempWallets.usd,
+      currency: "usd"
+    }).amount;
+    account.subwallets.yuan = convertFromUsd({
+      amount: tempWallets.yuan,
+      currency: "yuan"
+    }).amount;
+    account.subwallets.ngn = convertFromUsd({
+      amount: tempWallets.ngn,
+      currency: "ngn"
+    }).amount;
+    return { account, balance: 0 };
+  }
+};
+var convertToUsd = (to) => {
+  return {
+    currency: "usd",
+    amount: Number((to.amount / rates[to.currency]).toFixed(2))
+  };
+};
+var convertFromUsd = (from) => {
+  return {
+    currency: from.currency,
+    amount: Number((from.amount * rates[from.currency]).toFixed(2))
+  };
+};
 
 // src/handlers/user.ts
 var makeUser = ({ repo }) => {
@@ -193,11 +254,11 @@ var makeDeposit = ({ db: db2 }) => ({ userId, amount, currency }) => {
   var currencies = Object.keys(account.subwallets);
   if (!currencies.includes(currency))
     throw new AppError("Currency not supported", 404);
-  account.subwallets[currency] = amount;
+  account.subwallets[currency] += amount;
   return account;
 };
 var makeTransfer = ({ db: db2 }) => ({ amount, userId, recepientAccountId, currency }) => {
-  const sender = db2.Accounts.find((x) => x.userId == userId);
+  let sender = db2.Accounts.find((x) => x.userId == userId);
   const receipentAccount = db2.Accounts.find(
     (x) => x.id == recepientAccountId
   );
@@ -205,19 +266,12 @@ var makeTransfer = ({ db: db2 }) => ({ amount, userId, recepientAccountId, curre
     throw new AppError("Sender account not found", 404);
   if (!receipentAccount)
     throw new AppError("Receipent account not found", 404);
-  if (amount < sender.subwallets[currency]) {
-    sender.balance -= amount;
-    receipentAccount.balance += amount;
+  var response = TransferFund(sender, amount, currency);
+  if (response.balance > 0) {
+    throw new AppError("Insufficient balance", 400);
   } else {
-    let subbalance = { usd: 0, ngn: 0, gdp: 0, yuan: 0 };
-    subbalance[currency] = sender.subwallets[currency];
-    let totalbalance = sender.subwallets[currency];
-    for (const key in subbalance) {
-      if (key === currency)
-        continue;
-      if (totalbalance >= amount)
-        return;
-    }
+    sender = response.account;
+    receipentAccount.subwallets[currency] += amount;
   }
   return sender;
 };
